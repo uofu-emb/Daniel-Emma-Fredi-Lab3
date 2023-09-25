@@ -5,9 +5,11 @@ struct k_sem test_semaphore;
 int test_counter;
 struct k_timer timer;
 
-struct k_thread coop_thread, coop_thread2;
+struct k_thread coop_thread, coop_thread2, orphan_thread, adopted_thread;
 K_THREAD_STACK_DEFINE(coop_stack, STACKSIZE);
 K_THREAD_STACK_DEFINE(coop_stack2, STACKSIZE);
+K_THREAD_STACK_DEFINE(orphan_stack, STACKSIZE);
+K_THREAD_STACK_DEFINE(adopted_stack, STACKSIZE);
 
 void setUp() {
     k_sem_init(&test_semaphore, 1, 1);
@@ -71,13 +73,62 @@ void test_deadlock() {
 
     k_thread_abort(&coop_thread);
     k_thread_abort(&coop_thread2);
+}
 
+void test_orphan() {
+    k_thread_create(&orphan_thread,
+                    orphan_stack,
+                    STACKSIZE,
+                    (k_thread_entry_t) orphaned_lock,
+                    &test_semaphore,
+                    &test_counter,
+                    NULL,
+                    K_PRIO_COOP(7),
+                    0,
+                    K_NO_WAIT);
+
+    
+    struct k_timer short_timer;
+    k_timer_init(&short_timer, NULL, NULL);
+    k_timer_start(&short_timer, K_MSEC(1), K_NO_WAIT);
+    k_timer_status_sync(&short_timer);
+
+    TEST_ASSERT_EQUAL(0, k_sem_count_get(&test_semaphore));
+    TEST_ASSERT_EQUAL(1, test_counter);
+
+    k_thread_abort(&orphan_thread);
+}
+
+void test_adopted() {
+    k_thread_create(&adopted_thread,
+                    adopted_stack,
+                    STACKSIZE,
+                    (k_thread_entry_t) adopted_lock,
+                    &test_semaphore,
+                    &test_counter,
+                    NULL,
+                    K_PRIO_COOP(7),
+                    0,
+                    K_NO_WAIT);
+
+    
+    struct k_timer short_timer;
+    k_timer_init(&short_timer, NULL, NULL);
+    k_timer_start(&short_timer, K_MSEC(1), K_NO_WAIT);
+    k_timer_status_sync(&short_timer);
+
+    TEST_ASSERT_EQUAL(1, k_sem_count_get(&test_semaphore));
+    TEST_ASSERT_EQUAL(10, test_counter);
+
+    k_thread_abort(&adopted_thread);
 }
 
 int main() {
     UNITY_BEGIN();
     // RUN_TEST(test_counter_normal);
     // RUN_TEST(test_counter_blocked);
-    RUN_TEST(test_deadlock);
+    // RUN_TEST(test_deadlock);
+    RUN_TEST(test_orphan);
+    RUN_TEST(test_adopted);
     return UNITY_END();
 }

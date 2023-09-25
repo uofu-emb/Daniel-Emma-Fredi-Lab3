@@ -8,3 +8,5 @@
 
 void count_loop_iteration(struct k_timer* timer, char* context_name, struct k_sem* semaphore, int* counter);
 void deadlock_a(struct k_sem* sem1, struct k_sem* sem2, struct k_timer* timer);
+void orphaned_lock(struct k_sem* sem, int* counter);
+void adopted_lock(struct k_sem* sem, int* counter);
